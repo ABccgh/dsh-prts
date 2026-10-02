@@ -1,0 +1,25 @@
+THIS DIRECTORY IS THE LIVE INSTALL TARGET OF A DSH PROFILE BUNDLE.
+DO NOT DELETE, MOVE, OR RENAME IT.
+
+profile : %DSH_HOME%\profiles\desktop
+junction: %DSH_HOME%\profiles\desktop\node_modules\@local\prts
+bundle  : @local/prts  (PRTS 工具：prts_*，9 个只读工具)
+
+Deleting or moving this directory removes every prts_* tool until the bundle is
+reinstalled with:
+
+    plugin_manager  action: install_bundle  target: %USERPROFILE%\dsh-bundles\prts
+
+---
+
+This file lives in the repository on purpose: the sync command below uses /MIR,
+which deletes any destination file that is not in the source. Keeping the marker
+in the source is what stops the sync from deleting it.
+
+编辑代码时改仓库，再同步过来：
+
+    robocopy "<仓库路径>" "%USERPROFILE%\dsh-bundles\prts" /MIR /XD .git test
+
+同步后**必须重启 DSH** 才会生效：Host 进程会缓存已加载的 ESM 模块，插件页关开
+与 HMR 重载都只重新装配配置，不会重新读代码。只改 cordis.patch.yml 的配置值，
+则不需要重启（但要手动重载一次）。

@@ -1,0 +1,10 @@
+node_modules/
+*.log
+.DS_Store
+Thumbs.db
+
+# 本插件不需要任何密钥；这几条是防御性的，避免以后误提交。
+.env
+.env.*
+.credentials.yaml
+*.pem

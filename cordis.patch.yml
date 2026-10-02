@@ -1,0 +1,33 @@
+# dsh-prts — 把 PRTS（明日方舟 Wiki）接进 DeepSeek Harness
+#
+# 本文件既是 bundle 的 patch 层，也是这份插件的**运行时配置**。
+# 真正被读取的是**安装副本**里的这一份（%USERPROFILE%\dsh-bundles\prts\cordis.patch.yml），
+# 不是仓库里的这份——改配置要改副本（或用 DO-NOT-DELETE.txt 里的同步命令再推一次）。
+#
+# 改完需要**手动重载**（插件页把 prts 关开一次）；改代码则必须重启 DSH：
+# Host 进程会缓存已加载的 ESM 模块，插件页开关与 HMR 只重装配置，不会重新读代码。
+#
+# 无需任何密钥、无需登录：prts.wiki 公开可读（writeapi=false）。
+#
+# 该站的 URL 形态与常见 MediaWiki 不同（实测 2026-10-02）：
+#   接口：https://prts.wiki/api.php   （scriptpath 为空，接口在根路径）
+#   文章：https://prts.wiki/w/<标题>  （articlepath=/w/$1）
+# 所以 articlePath 必须显式写，不能从 wikiBaseUrl 推。
+- insert:
+    - id: prts
+      name: '@local/prts'
+      config:
+        wikiBaseUrl: https://prts.wiki
+        apiPath: /api.php
+        articlePath: /w/$1
+        userAgent: 'dsh-prts/0.1 (+https://github.com/ABccgh/dsh-prts; read-only)'
+        requestTimeoutMs: 20000
+        maxChars: 20000
+        maxListedItems: 50
+        cacheTtlMs: 300000
+        cacheMaxEntries: 24
+        throttleAttempts: 3
+        throttleBaseDelayMs: 1200
+        trustSystemCa: auto
+        webFallback: true
+        keepImages: false
