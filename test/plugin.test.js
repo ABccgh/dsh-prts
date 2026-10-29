@@ -23,6 +23,7 @@ const EXPECTED_TOOLS = [
   'prts_status', 'prts_search', 'prts_titles',
   'prts_page', 'prts_sections', 'prts_page_info',
   'prts_links', 'prts_category', 'prts_recent_changes',
+  'prts_operator',
 ];
 
 /** JSON 响应。 */
@@ -134,7 +135,7 @@ test('模块契约：导出 name / inject / apply / normalizeConfig，且不导�
   assert.equal('Config' in plugin, false, '没有 Config 时 cordis 会原样透传配置对象');
 });
 
-test('注册 9 个工具，且每个定义完整、参数里没有多余的多站点参数', async () => {
+test('注册 10 个工具，且每个定义完整、参数里没有多余的多站点参数', async () => {
   const { tools, returned } = await boot();
   assert.deepEqual([...tools.keys()].sort(), [...EXPECTED_TOOLS].sort());
   for (const [toolName, definition] of tools) {

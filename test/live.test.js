@@ -171,3 +171,20 @@ test('live：prts_recent_changes 带时区说明', { skip: !LIVE }, async () => 
   assert.ok(text.includes('Asia/Shanghai'), text);
   assert.ok(text.includes('改动'), text);
 });
+
+test('live：prts_operator 解析能天使档案（wikitext 模板）', { skip: !LIVE }, async () => {
+  const tools = await boot();
+  const text = await call(tools, 'prts_operator', { title: '能天使' });
+  assert.ok(text.includes('稀有度：6★'), text);
+  assert.ok(text.includes('职业：狙击'), text);
+  assert.ok(text.includes('分支：速射手'), text);
+  assert.ok(text.includes('来源：https://prts.wiki/'), text);
+  assert.ok(!text.includes('{{'), '不应漏出 wikitext 模板原文');
+});
+
+test('live：prts_operator 对非干员页降级为正文提示', { skip: !LIVE }, async () => {
+  const tools = await boot();
+  const text = await call(tools, 'prts_operator', { title: '龙门币' });
+  assert.ok(text.includes('没有找到 {{CharinfoV2}}'), text);
+  assert.ok(text.includes('prts_page'), text);
+});

@@ -3,7 +3,7 @@ DO NOT DELETE, MOVE, OR RENAME IT.
 
 profile : %DSH_HOME%\profiles\desktop
 junction: %DSH_HOME%\profiles\desktop\node_modules\@local\prts
-bundle  : @local/prts  (PRTS 工具：prts_*，9 个只读工具)
+bundle  : @local/prts  (PRTS 工具：prts_*，10 个只读工具)
 
 Deleting or moving this directory removes every prts_* tool until the bundle is
 reinstalled with:

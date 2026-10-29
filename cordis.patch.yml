@@ -20,7 +20,7 @@
         wikiBaseUrl: https://prts.wiki
         apiPath: /api.php
         articlePath: /w/$1
-        userAgent: 'dsh-prts/0.1 (+https://github.com/ABccgh/dsh-prts; read-only)'
+        userAgent: 'dsh-prts/1.0 (+https://github.com/ABccgh/dsh-prts; read-only)'
         requestTimeoutMs: 20000
         maxChars: 20000
         maxListedItems: 50

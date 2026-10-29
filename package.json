@@ -1,9 +1,9 @@
 {
   "name": "@local/prts",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "private": true,
   "type": "module",
-  "description": "PRTS (Arknights wiki) tools for DeepSeek Harness: read-only search and page access",
+  "description": "PRTS (Arknights wiki) tools for DeepSeek Harness: read-only search, page access and structured operator profiles parsed from wikitext templates",
   "license": "MIT",
   "exports": {
     ".": "./lib/index.js",
@@ -16,7 +16,7 @@
   ],
   "meta": {
     "title": "PRTS",
-    "description": "把 PRTS（prts.wiki，明日方舟中文 Wiki，MediaWiki 1.43）接进来：9 个只读 prts_* 工具，覆盖全文检索、页面正文、目录、分类、链接与最近改动。"
+    "description": "把 PRTS（prts.wiki，明日方舟中文 Wiki，MediaWiki 1.43）接进来：10 个只读 prts_* 工具，覆盖全文检索、页面正文、目录、分类、链接、最近改动，以及从 wikitext 模板解析的 prts_operator 干员档案。"
   },
   "scripts": {
     "test": "node --test \"test/*.test.js\"",
