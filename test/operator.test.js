@@ -117,7 +117,8 @@ test('prts_operator（能天使）: 解析 CharinfoV2/干员获得方式/属性 
   assert.match(text, /阵营\/组织：炎-龙门 · 企鹅物流/);
   assert.match(text, /画师：幻象黑兔/);
   assert.match(text, /CV：蔡书瑾（中） · 石见舞菜香（日）/);
-  assert.match(text, /属性：再部署 70s · 部署费用 12→14 · 阻挡数 1 · 攻击速度 1\.0s · 势力 炎-龙门,企鹅物流/);
+  assert.match(text, /属性：再部署 70s · 部署费用 12→14 · 阻挡数 1 · 攻击速度 1\.0s/);
+  assert.doesNotMatch(text, /属性：.*势力/, '属性里的「势力」与阵营/组织重复，不该再出现');
   assert.match(text, /来源：https:\/\/prts\.wiki\/w\/.+（PRTS，第三方内容；revid 442591）/);
   // 不能漏出 wikitext 噪声。
   assert.doesNotMatch(text, /\{\{/);
@@ -139,6 +140,7 @@ test('prts_operator（阿米娅）: 嵌套 {{color}} 与 <br> 被清洗，缺少
   assert.match(text, /稀有度：5★（CharinfoV2 稀有度=4）/);
   assert.match(text, /特性：攻击造成法术伤害/);
   assert.match(text, /阵营\/组织：罗德岛/);
+  assert.match(text, /CV：陶典（中） · 黑泽朋世（日） · 李智贤（韩） · Emma Ballantine（英）/);
   assert.match(text, /覆盖：主线剧情 \/ （首次通关主题曲2-10、3-8获取）/);
   assert.doesNotMatch(text, /\{\{/);
 });
@@ -209,14 +211,19 @@ test('cleanInline: 剥模板/链接/HTML/注释，保留可读文本', () => {
   assert.equal(cleanInline('<!-- 注释 --> 文本 '), '文本');
   assert.equal(cleanInline('<span class="x">值</span>'), '值');
   assert.equal(cleanInline(undefined), '');
+  // PRTS 的部分字段用 `;;` 分隔多个值（实测 `|隐藏势力=雷姆必拓;;巴别塔`）。
+  assert.equal(cleanInline('雷姆必拓;;巴别塔'), '雷姆必拓、巴别塔');
+  assert.equal(cleanInline('输出;; 爆发 ;;生存'), '输出、爆发、生存');
 });
 
 test('describeAttributes: 只输出可读的常用属性', () => {
   assert.equal(
     describeAttributes({ 再部署: '70s', 部署费用: '12→14', 阻挡数: '1', 攻击速度: '1.0s', 所属势力: '罗德岛' }),
-    '再部署 70s · 部署费用 12→14 · 阻挡数 1 · 攻击速度 1.0s · 势力 罗德岛',
+    '再部署 70s · 部署费用 12→14 · 阻挡数 1 · 攻击速度 1.0s',
+    '属性里的「势力」与阵营/组织重复，不再输出',
   );
   assert.equal(describeAttributes({ 精英2_满级_生命上限: '1673' }), '');
+  assert.equal(describeAttributes({ 隐藏势力: '雷姆必拓;;巴别塔' }), '', '隐藏势力也是阵营/组织的重复项');
   assert.equal(describeAttributes(null), '');
 });
 

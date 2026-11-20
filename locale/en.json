@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "PRTS",
+    "description": "Read-only PRTS (Arknights wiki) tools: search, page text, sections, categories, links, recent changes and structured operator profiles parsed from wikitext."
+  }
+}

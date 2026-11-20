@@ -1,16 +1,20 @@
 {
   "name": "@local/prts",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "private": true,
   "type": "module",
   "description": "PRTS (Arknights wiki) tools for DeepSeek Harness: read-only search, page access and structured operator profiles parsed from wikitext templates",
   "license": "MIT",
   "exports": {
     ".": "./lib/index.js",
+    "./locale/*.json": "./locale/*.json",
+    "./icon": "./icon.svg",
     "./package.json": "./package.json"
   },
   "files": [
     "lib/**/*.js",
+    "locale/*.json",
+    "icon.svg",
     "cordis.patch.yml",
     "README.md"
   ],

@@ -74,6 +74,31 @@ export const SEARCH = {
 /** 无命中的检索。 */
 export const SEARCH_EMPTY = { batchcomplete: '', query: { searchinfo: { totalhits: 0 }, search: [] } };
 
+/** offset 越过命中总量的检索：接口仍返回 searchinfo.totalhits，但列表为空。 */
+export const SEARCH_OFFSET_PAST = {
+  batchcomplete: '',
+  query: { searchinfo: { totalhits: 5 }, search: [] },
+};
+
+/** 带接口警告的检索（`srnamespace=模板` 这类名字被静默忽略时的真实形状）。 */
+export const SEARCH_WITH_WARNING = {
+  warnings: { search: { warnings: 'Unrecognized value for parameter "srnamespace": 模板' } },
+  query: {
+    searchinfo: { totalhits: 1 },
+    search: [
+      {
+        ns: 10,
+        title: '模板:材料',
+        pageid: 700,
+        size: 3200,
+        wordcount: 150,
+        timestamp: '2025-11-02T08:00:00Z',
+        snippet: '{{#invoke:Material|row}} 材料行模板',
+      },
+    ],
+  },
+};
+
 /** 检索参数被拒。 */
 export const API_ERROR_BADVALUE = {
   error: { code: 'badvalue', info: 'Unrecognized value for parameter "srlimit".', docref: 'See https://prts.wiki/api.php for API usage.' },
@@ -198,6 +223,33 @@ export const PAGE_TEXT_FLAT = {
   parse: { title: '某数据页', pageid: 9001, revid: 1, text: '<div class="mw-parser-output"><div>只有一段正文。</div></div>' },
 };
 
+/**
+ * 强调/表格的真实片段夹具（阿米娅、能天使页上的同款形态，2026-11-20 取样）：
+ *
+ * - 表格与列表里含 `<b>`/`<i>`（旧实现会在这里留下 `**`/`*`）；
+ * - 单元格里含 `<div>`/`<p>`（旧实现会把一行表拆成几十行）；
+ * - `<big>` 与 `<img>` 是「误当成 `<b>`/`<i>`」的诱因（真站 8 个 `<big>`、183 个 `<img>`）。
+ */
+export const PAGE_TEXT_EMPHASIS = {
+  parse: {
+    title: '阿米娅',
+    pageid: 1751,
+    revid: 404892,
+    text: [
+      '<div class="mw-content-ltr mw-parser-output" lang="zh-Hans-CN" dir="ltr">',
+      '<h2>天赋</h2>',
+      '<ul><li><b>情绪吸收</b>：成功造成伤害后额外回复3点技力</li><li><i>精神爆发</i>：攻击力提升</li></ul>',
+      '<p><big>战术咏唱·γ型</big> 与 <img alt="技能图标"> 不应被当成强调</p>',
+      '<table class="wikitable">',
+      '<tr><th>潜能</th><td><b>部署费用-1</b></td></tr>',
+      '<tr><th>生命上限</th><td><div>699</div></td><td><p>958</p></td></tr>',
+      '</table>',
+      '<p>如需了解<b>所有干员的上线时间</b>，您也可以查阅<a href="#">干员上线时间一览</a>页面。</p>',
+      '</div>',
+    ].join(''),
+  },
+};
+
 /** 出链。 */
 export const LINKS = {
   batchcomplete: '',
@@ -217,7 +269,7 @@ export const LINKS = {
 /** 反向链接（含模板子页）。 */
 export const BACKLINKS = {
   batchcomplete: '',
-  continue: { lhcontinue: '900', continue: '||' },
+  continue: { blcontinue: '900', continue: '||' },
   query: {
     backlinks: [
       { pageid: 900, ns: 10, title: '模板:关卡报酬', redirect: false },
@@ -225,6 +277,35 @@ export const BACKLINKS = {
       { pageid: 1751, ns: 0, title: '阿米娅', redirect: true },
     ],
   },
+};
+
+/** 没有页面链接到它。 */
+export const BACKLINKS_EMPTY = { batchcomplete: '', query: { backlinks: [] } };
+
+/** 模板嵌入（`list=embeddedin`）：模板的真实使用者在这里。 */
+export const EMBEDDEDIN = {
+  batchcomplete: '',
+  continue: { eicontinue: '0|1700', continue: '-||' },
+  query: {
+    embeddedin: [
+      { pageid: 1697, ns: 0, title: 'Lancet-2' },
+      { pageid: 1698, ns: 0, title: 'Castle-3' },
+    ],
+  },
+};
+
+/** 没有页面嵌入它。 */
+export const EMBEDDEDIN_EMPTY = { batchcomplete: '', query: { embeddedin: [] } };
+
+/** 存在性探测命中（`prop=info` 单页）。 */
+export const PAGE_EXISTS_AMIYA = {
+  batchcomplete: '',
+  query: { pages: [{ pageid: 1751, ns: 0, title: '阿米娅', fullurl: 'https://prts.wiki/w/%E9%98%BF%E7%B1%B3%E5%A8%85' }] },
+};
+
+/** `action=parse&prop=wikitext&section=N` 的越界错误。 */
+export const API_ERROR_NOSUCHSECTION = {
+  error: { code: 'nosuchsection', info: 'There is no section 999 in 阿米娅.' },
 };
 
 /** 分类成员（标题自带本地化 `分类:` 前缀）。 */
@@ -360,6 +441,8 @@ export const OPERATOR_WIKITEXT_AMIYA = {
       '|画师=唯@W',
       '|中文配音=陶典',
       '|日文配音=黑泽朋世',
+      '|韩文配音=李智贤',
+      '|英文配音=Emma Ballantine',
       '}}',
       '==获得方式==',
       '{{干员获得方式',

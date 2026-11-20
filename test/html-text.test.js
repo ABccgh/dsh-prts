@@ -12,6 +12,7 @@ import assert from 'node:assert/strict';
 
 import {
   DEFAULT_DROP_CLASS_PREFIXES,
+  DEFAULT_DROP_CLASSES,
   cleanSnippet,
   decodeEntities,
   extractParserOutput,
@@ -24,13 +25,13 @@ import {
   toText,
   truncateText,
 } from '../lib/html-text.js';
-import { PAGE_TEXT, PAGE_TEXT_FLAT } from './fixtures/fixtures.js';
+import { PAGE_TEXT, PAGE_TEXT_EMPHASIS, PAGE_TEXT_FLAT } from './fixtures/fixtures.js';
 
 const pageHtml = PAGE_TEXT.parse.text;
 
-/** 默认配置下的归约。 */
-function reduce(html) {
-  return toText(html, { maxChars: 200_000 });
+/** 默认配置下的归约（可覆盖选项）。 */
+function reduce(html, options = {}) {
+  return toText(html, { maxChars: 200_000, ...options });
 }
 
 test('stripRawTextBlocks 摘掉原始文本元素的内容', () => {
@@ -190,4 +191,119 @@ test('cleanSnippet 词表可覆盖、空输入安全、URL 不被切碎', () => 
   const url = '接口在 https://prts.wiki/api.php?action=query&list=search 这里。';
   assert.equal(cleanSnippet(url), url);
   assert.equal(cleanSnippet('样板句。真内容。', { sentences: ['样板句'] }), '真内容。');
+});
+
+test('强调：b/i 正确配对、同类型嵌套只留一层、空强调不留残星', () => {
+  assert.equal(reduce('<p><b>粗体</b>普通</p>').text, '**粗体**普通');
+  assert.equal(reduce('<p><i>斜体</i>普通</p>').text, '*斜体*普通');
+  assert.equal(reduce('<p><b>外<i>内</i></b></p>').text, '**外*内***');
+  assert.equal(reduce('<p><b><b>双层</b></b></p>').text, '**双层**', '同类型嵌套不该叠成 ****');
+  assert.equal(reduce('<p>前<b></b>后<i></i>尾</p>').text, '前后尾', '空强调整对抹掉');
+  const withSpace = reduce('<p>前<b></b>后<i> </i>尾</p>').text;
+  assert.ok(!withSpace.includes('*'), withSpace);
+});
+
+test('回归：<big>/<img> 不能被当成 <b>/<i> 的开标签（真站强调错配的根因）', () => {
+  // 阿米娅页实测 8 个 <big>、183 个 <img>：旧实现写 `<(b|strong)[^>]*>`，
+  // `<big>` 会被当成 <b>、`<img>` 会被当成 <i>，与后面的闭标签错配，
+  // 于是正文里散落 `**`/`*`（真站复现 37 行带星号）。
+  const { text } = reduce('<p><big>战术咏唱·γ型</big></p><p><img alt="x">普通文本</p>'
+    + '<p>如需了解<b>所有干员的上线时间</b>，您也可以查阅<a href="#">干员上线时间一览</a>页面。</p>');
+  assert.equal(
+    text,
+    '战术咏唱·γ型\n\n普通文本\n\n如需了解**所有干员的上线时间**，您也可以查阅干员上线时间一览页面。',
+    text,
+  );
+  assert.equal((text.match(/\*/g) || []).length, 4, `只该有两对粗体标记：${text}`);
+});
+
+test('强调：只剩图片的强调、跨段落的强调都不留孤立标记', () => {
+  assert.equal(reduce('<p><b><img alt="x"></b></p>').text, '', '图片被丢掉后强调内容为空');
+  assert.equal(reduce('<p><b><img alt="图"></b></p>', { keepImages: true }).text, '**[图: 图]**');
+  const across = reduce('<p><b>开头<div>中间</div>结尾</b></p>').text;
+  assert.equal(across.includes('*'), false, `跨段强调不该输出标记：${across}`);
+});
+
+test('定义列表：dt 不再叠两层粗体，dd 仍是独立行', () => {
+  const { text } = reduce('<dl><dt>属性</dt><dd>值</dd><dt><b>已加粗的术语</b></dt><dd>说明</dd></dl>');
+  assert.ok(text.includes('- 属性'), text);
+  assert.ok(text.includes(': 值'), text);
+  assert.ok(text.includes('- **已加粗的术语**'), text);
+  assert.ok(!text.includes('****'), text);
+});
+
+test('表格：单元格里的 div/p/list 不换行，整行归约成 | a | b |', () => {
+  assert.equal(
+    reduce('<table><tr><td><div>代号</div></td><td><p>阿米娅</p></td></tr></table>').text,
+    '| 代号 | 阿米娅 |',
+  );
+  assert.equal(
+    reduce('<table><tr><td><div class="poem"><ul><li>可对空。</li></ul></div></td><td><b>说明</b></td></tr></table>').text,
+    '| 可对空。 | 说明 |',
+  );
+  const multi = reduce('<table><caption>精英化属性</caption><tr><th>生命上限</th>'
+    + '<td><div>699</div></td><td><p>958</p></td></tr></table>').text;
+  assert.ok(multi.includes('【表】精英化属性'), multi);
+  assert.ok(multi.split('\n').includes('| 生命上限 | 699 | 958 |'), multi);
+});
+
+test('真实形态（阿米娅风格）：表格/列表里的 <b> 不残留、不串行', () => {
+  const { text } = reduce('<h2>天赋</h2><ul><li><b>情绪吸收</b>：成功造成伤害后回复3点技力</li></ul>'
+    + '<table class="wikitable"><tr><th>潜能</th><td><b>部署费用-1</b></td></tr></table>');
+  assert.ok(text.includes('- **情绪吸收**：成功造成伤害后回复3点技力'), text);
+  assert.ok(text.split('\n').includes('| 潜能 | 部署费用-1 |'), text);
+  assert.equal((text.match(/\*\*/g) || []).length, 2, text);
+});
+
+test('父节包含子节正文：endLine 在同级或更高级标题处收束', () => {
+  const text = '# A\na\n## B\nb\n### B1\nb1\n## C\nc';
+  const outline = outlineFromText(text);
+  assert.equal(outline.sections[0].childSections, 3);
+  const parent = sliceSection(text, outline, 1);
+  assert.ok(parent.includes('## B') && parent.includes('b1') && parent.includes('## C'), parent);
+  assert.equal(sliceSection(text, outline, 2), '## B\nb\n### B1\nb1');
+  assert.equal(sliceSection(text, outline, 3), '### B1\nb1');
+  assert.equal(sliceSection(text, outline, 4), '## C\nc');
+  // 目录字符数就是切片长度，不再误导
+  assert.equal(parent.length, text.length);
+  assert.equal(outline.sections[1].endLine, outline.sections[3].startLine - 1);
+});
+
+test('truncateText 可以覆盖续读提示（读某一节时不再让人去看目录）', () => {
+  const text = `${'a'.repeat(50)}\n${'b'.repeat(50)}`;
+  const out = truncateText(text, 40, { hint: '提高 maxChars（上限 60000）。' });
+  assert.equal(out.truncated, true);
+  assert.ok(out.text.includes('已截断'), out.text);
+  assert.ok(out.text.includes('提高 maxChars'), out.text);
+  assert.ok(!out.text.includes('prts_sections'), out.text);
+});
+
+test('真实片段夹具（阿米娅/能天使风格）：表格/列表里的 <b> 不残留、单元格不拆行', () => {
+  const { text } = reduce(PAGE_TEXT_EMPHASIS.parse.text);
+  assert.ok(text.includes('- **情绪吸收**：成功造成伤害后额外回复3点技力'), text);
+  assert.ok(text.includes('- *精神爆发*：攻击力提升'), text);
+  assert.ok(text.includes('| 潜能 | 部署费用-1 |'), text);
+  assert.ok(text.includes('| 生命上限 | 699 | 958 |'), text);
+  // <big>/<img> 不该被当成强调
+  assert.ok(text.includes('战术咏唱·γ型'), text);
+  assert.ok(!text.includes('*战术咏唱'), text);
+  const stars = (text.match(/\*/g) || []).length;
+  assert.equal(stars % 2, 0, `粗体标记应当成对：${text}`);
+  assert.ok(text.includes('如需了解**所有干员的上线时间**，您也可以查阅干员上线时间一览页面。'), text);
+});
+
+test('干员页立绘/看板控件默认丢掉（2026-11-20 真站实测 class）', () => {
+  for (const name of [
+    'control-btns', 'control-btn-flex', 'control-btn-text', 'watchimg-btn', 'watchimg-btn-m',
+    'download-btn', 'voice-btn', 'img-switch-btn', 'dyn-btn', 'charpainter', 'painter-wrapper',
+    'charvoice-wrapper', 'charvoice-title', 'charcv-img', 'charcv-text-flex', 'chardyn-text', 'chardyn-collapse',
+  ]) {
+    assert.ok(DEFAULT_DROP_CLASSES.includes(name), `缺少 ${name}`);
+  }
+  const { text } = reduce('<div class="control-btns"><div class="control-btn-text">全屏查看</div>'
+    + '<div class="watchimg-btn">看图模式</div></div>'
+    + '<div class="charpainter"><span class="painter-left">绘制</span></div>'
+    + '<div class="charvoice-wrapper"><div class="charvoice-title">VOICE</div></div>'
+    + '<div class="chardyn-text">动作切换</div><p>正文</p>');
+  assert.equal(text, '正文');
 });

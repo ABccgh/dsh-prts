@@ -126,8 +126,55 @@ test('live：龙门币的掉落表（SMW 数据）必须在——这是 smw 规�
   const tools = await boot();
   const text = await call(tools, 'prts_page', { title: '龙门币' });
   assert.ok(text.includes('龙门币'), text);
-  const bulletLines = text.split('\n').filter((line) => line.trim().startsWith('- ')).length;
-  assert.ok(bulletLines >= 3, `掉落表应当保留若干行（实际 ${bulletLines} 行）：\n${text.slice(0, 500)}`);
+  // 单元格里的列表按「一行一格」归约后不再输出 `- ` 行，但**数据本体必须还在**：
+  // 掉落表的表头与若干整行。
+  assert.ok(text.includes('| 地点 | 理智 | 掉落总量 | 理智效率 |'), text.slice(0, 2500));
+  const rows = text.split('\n').filter((line) => /^\| .+ \| .+ \|$/.test(line));
+  assert.ok(rows.length >= 10, `掉落表应当保留若干行（实际 ${rows.length} 行）：\n${text.slice(0, 800)}`);
+  assert.ok(text.includes('固定掉落'), 'SMW 字段文本必须保留');
+});
+
+test('live：prts_search(namespace="模板") 真的只搜模板命名空间', { skip: !LIVE }, async () => {
+  const tools = await boot();
+  const text = await call(tools, 'prts_search', { query: '干员', namespace: '模板', limit: 5 });
+  assert.ok(text.includes('命名空间 模板'), text);
+  assert.ok(!text.includes('不认识的命名空间'), text);
+  // 命中条目的命名空间前缀都应是「模板:」
+  const itemLines = text.split('\n').filter((line) => /^\d+\. /u.test(line));
+  assert.ok(itemLines.length > 0, text);
+  for (const line of itemLines) assert.ok(line.includes('模板:'), `不该混入其它命名空间：${line}`);
+});
+
+test('live：prts_links(direction="in") 合并模板嵌入（模板:CharinfoV2 的使用者）', { skip: !LIVE }, async () => {
+  const tools = await boot();
+  const text = await call(tools, 'prts_links', { title: '模板:CharinfoV2', direction: 'in', limit: 3 });
+  assert.ok(text.includes('## 页面链接（list=backlinks'), text);
+  assert.ok(text.includes('## 模板嵌入（list=embeddedin'), text);
+  assert.ok(/## 模板嵌入（list=embeddedin，本次 [1-9]\d* 条）/.test(text), `模板嵌入不该为空：\n${text}`);
+});
+
+test('live：prts_page 的 wikitext 模式可以把 section 传给接口', { skip: !LIVE }, async () => {
+  const tools = await boot();
+  const text = await call(tools, 'prts_page', { title: '阿米娅', format: 'wikitext', section: 2, maxChars: 600 });
+  assert.ok(text.includes('范围：wikitext section=2'), text);
+  assert.ok(text.includes('```wikitext'), text);
+});
+
+test('live：prts_page 的正文里不应有强调错配留下的孤立标记', { skip: !LIVE }, async () => {
+  const tools = await boot();
+  const text = await call(tools, 'prts_page', { title: '阿米娅' });
+  // `<big>`/`<img>` 误当 `<b>`/`<i>` 时，行内会出现奇数个 `**`；这里逐行检查配对。
+  const odd = text.split('\n').filter((line) => (line.match(/\*\*/g) || []).length % 2 === 1);
+  assert.deepEqual(odd, [], `这些行的粗体标记没有配对：\n${odd.join('\n')}`);
+});
+
+test('live：prts_operator 的 CV 会显示中/日/韩/英（有就显示）', { skip: !LIVE }, async () => {
+  const tools = await boot();
+  const text = await call(tools, 'prts_operator', { title: '阿米娅' });
+  assert.match(text, /CV：.*（中）/);
+  assert.match(text, /CV：.*（日）/);
+  assert.match(text, /CV：.*（韩）/);
+  assert.match(text, /CV：.*（英）/);
 });
 
 test('live：prts_page 的 wikitext 模式可用', { skip: !LIVE }, async () => {

@@ -11,15 +11,19 @@ import {
   DEFAULT_NAMESPACE_LABELS,
   allPagesUrl,
   backlinksUrl,
+  buildNamespaceIndex,
   buildNamespaceLabels,
   categoryMembersUrl,
   categoryTitle,
+  embeddedInUrl,
   linksUrl,
   mapAllPages,
   mapApiError,
   mapBacklinks,
   mapCategoryMembers,
+  mapEmbeddedIn,
   mapLinks,
+  mapPageExistence,
   mapPageInfo,
   mapPageText,
   mapPrefixSearch,
@@ -28,6 +32,8 @@ import {
   mapSiteInfo,
   mapWikitext,
   namespaceLabel,
+  normalizeNamespaceName,
+  pageExistenceUrl,
   pageInfoUrl,
   pageTextUrl,
   prefixSearchUrl,
@@ -39,7 +45,7 @@ import {
 } from '../lib/mediawiki.js';
 import { DEFAULT_SITE, createSite, normalizeApiPath, normalizeArticlePath, pageUrl } from '../lib/sites.js';
 import {
-  BACKLINKS, CATEGORY_MEMBERS, LINKS, PAGE_INFO, PAGE_INFO_MISSING,
+  BACKLINKS, CATEGORY_MEMBERS, EMBEDDEDIN, LINKS, PAGE_EXISTS_AMIYA, PAGE_INFO, PAGE_INFO_MISSING,
   PREFIX_SEARCH, ALL_PAGES, RECENT_CHANGES, SEARCH, SITEINFO,
 } from './fixtures/fixtures.js';
 
@@ -222,4 +228,101 @@ test('mapApiError 只在真有 error 时返回对象', () => {
   assert.deepEqual(mapApiError({ error: { code: 'badvalue', info: 'x' } }), { code: 'badvalue', info: 'x' });
   assert.equal(mapApiError({}), undefined);
   assert.equal(mapApiError(undefined), undefined);
+});
+
+test('normalizeNamespaceName / buildNamespaceIndex：名字与别名都进索引，本地名字优先', () => {
+  assert.equal(normalizeNamespaceName('  模板: '), '模板');
+  assert.equal(normalizeNamespaceName(undefined), '');
+
+  const index = buildNamespaceIndex(SITEINFO);
+  assert.equal(index.ids['模板'], 10);
+  assert.equal(index.ids['template'], 10, 'canonical 名也要能解析');
+  assert.equal(index.ids['category'], 14);
+  assert.equal(index.ids['分类'], 14);
+  assert.equal(index.ids['媒体文件'], -2, '别名来自 namespacealiases');
+  assert.equal(index.ids['project'], 4, '4 的 canonical 是 Project，本地名是 PRTS');
+  assert.equal(index.ids['prts'], 4);
+  assert.ok(index.list.some((entry) => entry.id === 274 && entry.name === '微件'));
+  assert.equal(index.ids[''], undefined, '空名字不入索引');
+
+  // 冲突：10 的别名与 3002 的本地名字都是「样板」→ 本地名字优先
+  const conflict = {
+    query: {
+      namespaces: {
+        10: { id: 10, name: '模板', canonical: 'Template' },
+        3002: { id: 3002, name: '样板', canonical: 'Sample' },
+      },
+      namespacealiases: [{ id: 10, alias: '样板' }],
+    },
+  };
+  assert.equal(buildNamespaceIndex(conflict).ids['样板'], 3002);
+  assert.equal(buildNamespaceIndex(conflict).ids['sample'], 3002);
+});
+
+test('mapSiteInfo：带命名空间索引与清单，字母大小写无关', () => {
+  const info = mapSiteInfo(SITEINFO);
+  assert.equal(info.namespaceIds['模板'], 10);
+  assert.ok(info.namespaceList.some((entry) => entry.id === 14 && entry.name === '分类'));
+});
+
+test('URL 契约：标题前缀 offset、wikitext section、存在性探测', () => {
+  const prefix = params(prefixSearchUrl(site, { query: '阿米娅', limit: 5, namespace: '*', offset: 20 }));
+  assert.equal(prefix.get('psoffset'), '20');
+
+  const wikitext = params(wikitextUrl(site, { title: '阿米娅', section: 2 }));
+  assert.equal(wikitext.get('page'), '阿米娅');
+  assert.equal(wikitext.get('section'), '2');
+  assert.equal(params(wikitextUrl(site, { title: '阿米娅' })).has('section'), false, '不传 section 就不带');
+
+  const exists = params(pageExistenceUrl(site, { title: '模板:干员' }));
+  assert.equal(exists.get('action'), 'query');
+  assert.equal(exists.get('titles'), '模板:干员');
+  assert.equal(exists.get('prop'), 'info');
+  assert.equal(exists.get('redirects'), '1');
+});
+
+test('URL 契约：反向链接 / 模板嵌入 / 列表续取参数', () => {
+  const embed = params(embeddedInUrl(site, { title: '模板:干员', limit: 30, namespace: 10 }));
+  assert.equal(embed.get('list'), 'embeddedin');
+  assert.equal(embed.get('eititle'), '模板:干员');
+  assert.equal(embed.get('eilimit'), '30');
+  assert.equal(embed.get('einsnamespace'), '10');
+  assert.equal(params(embeddedInUrl(site, { title: 'X', continuation: { eicontinue: '0|1700', continue: '-||' } })).get('eicontinue'), '0|1700');
+
+  const links = params(linksUrl(site, { title: '阿米娅', continuation: { plcontinue: '1751|0|12F', continue: '||' } }));
+  assert.equal(links.get('plcontinue'), '1751|0|12F');
+  assert.equal(links.get('continue'), '||');
+
+  const back = params(backlinksUrl(site, { title: '阿米娅', continuation: { blcontinue: '900' } }));
+  assert.equal(back.get('blcontinue'), '900');
+
+  const category = params(categoryMembersUrl(site, { category: '干员', continuation: { cmcontinue: 'page|1' } }));
+  assert.equal(category.get('cmcontinue'), 'page|1');
+
+  const recent = params(recentChangesUrl(site, { limit: 20, days: 3, continuation: { rccontinue: '2026|1' } }));
+  assert.equal(recent.get('rccontinue'), '2026|1');
+});
+
+test('mapPrefixSearch / mapEmbeddedIn / mapPageExistence', () => {
+  const prefix = mapPrefixSearch(PREFIX_SEARCH);
+  assert.equal(prefix.hasMore, true);
+  assert.equal(prefix.offset, 3, '下一页的 psoffset 要带出来');
+  assert.equal(mapPrefixSearch({}).offset, null);
+
+  const embedded = mapEmbeddedIn(EMBEDDEDIN);
+  assert.deepEqual(embedded.map((item) => item.title), ['Lancet-2', 'Castle-3']);
+  assert.deepEqual(mapEmbeddedIn({}).length, 0);
+
+  const exists = mapPageExistence(PAGE_EXISTS_AMIYA);
+  assert.equal(exists.found, true);
+  assert.equal(exists.title, '阿米娅');
+  const missing = mapPageExistence(PAGE_INFO_MISSING);
+  assert.equal(missing.found, false);
+  assert.equal(missing.missing, true);
+  assert.equal(mapPageExistence(undefined).found, false);
+});
+
+test('BACKLINKS 夹具的续取键是 blcontinue（真站形状）', () => {
+  assert.equal(BACKLINKS.continue.blcontinue, '900');
+  assert.equal(BACKLINKS.continue.continue, '||');
 });
